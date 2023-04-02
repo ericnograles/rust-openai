@@ -1,8 +1,9 @@
-use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, web, App, HttpResponse, HttpRequest, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
 use uuid::Uuid;
+
 mod auth;
 mod kafka_producer;
 
@@ -29,18 +30,19 @@ async fn ingest(request: HttpRequest, data: web::Json<IngestData>) -> impl Respo
     let ingest_data = data.into_inner();
     println!("Received data: {:?}", ingest_data);
 
-    let send_result = send_to_kafka(ingest_data).await;
+    let response = HttpResponse::Ok().json(json!({
+        "status": "success",
+        "message": "Data ingested successfully"
+    }));
 
-    match send_result {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "status": "success",
-            "message": "Data ingested successfully"
-        })),
-        Err(err) => HttpResponse::InternalServerError().json(json!({
-            "status": "error",
-            "message": format!("Failed to send data to Kafka: {}", err)
-        })),
-    }
+    tokio::spawn(async move {
+        match send_to_kafka(ingest_data).await {
+            Ok(_) => println!("Data sent to Kafka successfully"),
+            Err(err) => eprintln!("Failed to send data to Kafka: {}", err),
+        }
+    });
+
+    response
 }
 
 #[actix_web::main]
