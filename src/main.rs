@@ -3,12 +3,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
 use uuid::Uuid;
+use dotenv::dotenv;
 
 mod auth;
 mod kafka_producer;
+mod kafka_consumer;
 
 use auth::validate_jwt;
 use kafka_producer::send_to_kafka;
+use kafka_consumer::consume_kafka_messages;
 
 #[get("/")]
 async fn index() -> impl Responder {
@@ -47,8 +50,11 @@ async fn ingest(request: HttpRequest, data: web::Json<IngestData>) -> impl Respo
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv().ok();
     let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+
+    consume_kafka_messages().await;
 
     HttpServer::new(|| {
         App::new()
